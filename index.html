@@ -60,7 +60,7 @@ h1 span{color:var(--accent)}
 /* board */
 .board{background:linear-gradient(180deg,var(--board-hi),var(--board));border:3px solid var(--board-edge);border-radius:18px;
   padding:10px 10px 12px;color:var(--board-fg);box-shadow:0 10px 24px -14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12)}
-.row{display:grid;grid-template-columns:1.6em 1fr var(--kw,64px);align-items:center;gap:8px;padding:5px 6px;border-radius:12px}
+.row{display:grid;grid-template-columns:1.4em minmax(0,1fr) var(--kw,54px);align-items:center;gap:6px;padding:5px 4px;border-radius:12px}
 .row + .row{margin-top:2px}
 .row.current{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.28)}
 .row.past{cursor:pointer}
@@ -70,12 +70,13 @@ h1 span{color:var(--accent)}
 .draft-tag{font-size:.62rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em;text-align:center}
 .row.past:hover{background:rgba(255,255,255,.06)}
 .num{font-variant-numeric:tabular-nums;font-size:.8rem;opacity:.7;text-align:right}
-.slots{display:flex;gap:clamp(4px,1.6vw,8px);justify-content:center;min-width:0}
+.slots{display:flex;gap:6px;justify-content:center;min-width:0;container-type:inline-size}
+.slots .peg{--ps:min(var(--peg), calc((100cqw - (var(--n, 4) - 1) * 6px) / var(--n, 4)))}
 .secret{border-bottom:2px dashed rgba(255,255,255,.25);padding-bottom:10px;margin-bottom:6px}
 .secret .num{font-size:.95rem;opacity:.9}
 
-.peg{width:var(--peg);height:var(--peg);border-radius:50%;flex:none;border:0;padding:0;position:relative;
-  display:grid;place-items:center;font-size:calc(var(--peg) * .42);line-height:1;color:rgba(0,0,0,.55);
+.peg{width:var(--ps, var(--peg));height:var(--ps, var(--peg));border-radius:50%;flex:none;border:0;padding:0;position:relative;
+  display:grid;place-items:center;font-size:calc(var(--ps, var(--peg)) * .42);line-height:1;color:rgba(0,0,0,.55);
   background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.75) 0 9%, transparent 28%), var(--c);
   box-shadow:inset 0 -3px 5px rgba(0,0,0,.28), 0 2px 3px rgba(0,0,0,.35)}
 .peg.hole{background:var(--hole);box-shadow:inset 0 3px 5px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.12)}
@@ -90,6 +91,13 @@ button.peg:active{transform:scale(.93)}
 
 .keys{display:grid;grid-auto-flow:column;grid-template-rows:repeat(2, 12px);gap:4px;padding:3px;border-radius:8px;background:rgba(0,0,0,.12)}
 .keys.pos{grid-template-rows:12px}
+.keys.small{grid-template-rows:repeat(2, 10px);gap:3px}
+.keys.pos.small{grid-template-rows:10px}
+.keys.small .k{width:10px;height:10px}
+.mark{position:absolute;right:-3px;bottom:-3px;width:42%;height:42%;border-radius:50%}
+.mark.b{background:radial-gradient(circle at 35% 30%, #6b6b6b, #0d0d0d 70%);box-shadow:0 0 0 2px #f3f1ea}
+.mark.w{background:radial-gradient(circle at 35% 30%, #fff, #d9d9d9 70%);box-shadow:0 0 0 2px #1b2a33}
+.pos-sum{justify-self:center;font-size:.8rem;font-variant-numeric:tabular-nums;opacity:.9;white-space:nowrap}
 .k{width:12px;height:12px;border-radius:50%;background:var(--hole);box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
 .k.b{background:radial-gradient(circle at 35% 30%, #6b6b6b, #0d0d0d 70%);box-shadow:0 0 0 1px rgba(255,255,255,.4)}
 .k.w{background:radial-gradient(circle at 35% 30%, #fff, #d9d9d9 70%);box-shadow:0 1px 1px rgba(0,0,0,.4)}
@@ -211,7 +219,7 @@ button.peg:active{transform:scale(.93)}
     <p>L'ordinateur cache un code de pions colorés. Trouve-le en un minimum d'essais.</p>
     <p>Touche une couleur pour la poser dans la case sélectionnée. Touche une case pour la sélectionner, touche-la encore pour la vider. Touche une ligne déjà jouée pour la recopier dans la ligne sélectionnée.</p>
     <p>Seule la ligne encadrée, juste après le dernier essai, est validée et comptée. Les lignes suivantes sont un <b>brouillon</b> : pose-y ce que tu veux pour réfléchir. Quand tu valides, la ligne suivante devient la ligne à jouer avec ce que tu y avais mis.</p>
-    <p>Après chaque essai : un pion <b>noir</b> par pion de bonne couleur à la bonne place, un pion <b>blanc</b> par pion de bonne couleur mal placé. En mode <b>groupé</b>, l'ordre des indices ne dit pas quels pions sont concernés. En mode <b>placé</b>, chaque indice est en face de son pion (le 1er indice correspond au 1er pion).</p>
+    <p>Après chaque essai : un pion <b>noir</b> par pion de bonne couleur à la bonne place, un pion <b>blanc</b> par pion de bonne couleur mal placé. En mode <b>groupé</b>, l'ordre des indices ne dit pas quels pions sont concernés. En mode <b>placé</b>, chaque indice est posé directement sur le pion qu'il concerne.</p>
     <p><b>Unique</b> : chaque couleur au plus une fois dans le code. <b>Double</b> : au plus deux fois. <b>Libre</b> : sans limite. Tes propositions, elles, peuvent répéter librement.</p>
     <p>Clavier : chiffres 1 à 9 et 0 pour les couleurs, Retour arrière pour effacer, flèches pour changer de case ou de ligne, Entrée pour valider.</p>
     <div class="sheet-actions"><button class="btn primary" id="helpClose">Compris</button></div>
@@ -393,7 +401,7 @@ function pegEl(c, s, opts={}){
   return el;
 }
 function keysEl(r, k, posMode){
-  const el = document.createElement("div"); el.className = "keys" + (posMode ? " pos" : "");
+  const el = document.createElement("div"); el.className = "keys" + (posMode ? " pos" : "") + (k >= 5 ? " small" : "");
   el.setAttribute("aria-label", r ? `${r.b} bien placé${r.b>1?"s":""}, ${r.w} mal placé${r.w>1?"s":""}` : "pas encore d'indice");
   for (let i=0;i<k;i++){
     const d = document.createElement("i"); d.className = "k";
@@ -412,8 +420,9 @@ function render(justPlayed){
   const s = game.s, board = $("board");
   document.body.classList.toggle("nosym", !settings.sym);
   board.innerHTML = "";
-  const kc = s.hint === "positional" ? s.len : Math.ceil(s.len/2);
-  board.style.setProperty("--kw", Math.max(64, kc*16 + 8) + "px");
+  const kc = s.hint === "positional" ? 0 : Math.ceil(s.len/2), kd = s.len >= 5 ? 13 : 16;
+  board.style.setProperty("--kw", Math.max(54, kc*kd + 8) + "px");
+  board.style.setProperty("--n", s.len);
   // secret
   const sec = row("", "secret");
   sec.querySelector(".num").textContent = game.over ? (game.won ? "✓" : "✗") : "";
@@ -427,8 +436,18 @@ function render(justPlayed){
   game.guesses.forEach((g, i) => {
     const r = row(i+1, "past" + (justPlayed && i === game.guesses.length-1 ? " just" : ""));
     const sl = document.createElement("div"); sl.className = "slots";
-    g.code.forEach(c => sl.appendChild(pegEl(c, s)));
-    r.appendChild(sl); r.appendChild(keysEl(g, s.len, s.hint === "positional"));
+    const posMode = s.hint === "positional" && g.pos;
+    g.code.forEach((c, i) => {
+      const pe = pegEl(c, s);
+      if (posMode && g.pos[i]){
+        const mk = document.createElement("i"); mk.className = "mark " + g.pos[i]; pe.appendChild(mk);
+        pe.setAttribute("aria-label", pe.getAttribute("aria-label") + (g.pos[i] === "b" ? ", bien placé" : ", mal placé"));
+      }
+      sl.appendChild(pe);
+    });
+    r.appendChild(sl);
+    if (posMode){ const t = document.createElement("span"); t.className = "pos-sum"; t.textContent = g.b + " ● " + g.w + " ○"; t.setAttribute("aria-hidden","true"); r.appendChild(t); }
+    else r.appendChild(keysEl(g, s.len, false));
     r.title = "Recopier cette ligne";
     r.addEventListener("click", () => { if (game.over) return; game.rows[game.sel.row] = g.code.slice(); game.sel.col = s.len-1; save(); render(); });
     board.appendChild(r);
@@ -532,7 +551,7 @@ function drawSettings(){
   seg($("segEmpty"), [[false,"Non"],[true,"Oui, avec trou vide"]], () => d.empty, v => d.empty = v);
   seg($("segDup"), DUPS, () => d.dup, v => d.dup = v);
   seg($("segHint"), [["grouped","Groupés (classique)"],["positional","À la place du pion (plus facile)"]], () => d.hint, v => d.hint = v);
-  $("hintHint").textContent = d.hint === "positional" ? "Chaque indice est posé en face du pion qu'il concerne : tu sais quel pion est bien placé." : "Les indices sont regroupés, noirs d'abord : tu ne sais pas quel pion est concerné.";
+  $("hintHint").textContent = d.hint === "positional" ? "Chaque indice est posé sur le pion qu'il concerne : tu sais quel pion est bien placé." : "Les indices sont regroupés, noirs d'abord : tu ne sais pas quel pion est concerné.";
   seg($("segTries"), TRIES.map(n => [n, n ? String(n) : "∞"]), () => d.tries, v => d.tries = v);
   seg($("segSym"), [[true,"Symboles sur les pions"],[false,"Sans symboles"]], () => d.sym, v => d.sym = v);
   seg($("segCount"), [[false,"Sans compteur"],[true,"Compter les codes encore possibles"]], () => d.count, v => d.count = v);
