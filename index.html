@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#466879">
+<meta name="description" content="Jeu de déduction de code coloré avec niveaux réglables.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Code Secret">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+<title>Code Secret</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Rubik:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column, a plastic game board in the middle, palette docked at the bottom like a peg tray */
+:root{
+  --bg:#e9eef0; --surface:#ffffff; --fg:#1b2a33; --muted:#5d707b; --line:#cbd6db;
+  --accent:#e0812a; --accent-fg:#ffffff;
+  --board:#466879; --board-hi:#557a8c; --board-edge:#2f4a57; --hole:#2a414c; --board-fg:#e6eff3;
+  --ok:#2f8f5b; --bad:#c2423a;
+  --display:"Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body:"Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --peg:clamp(30px, 9.2vw, 40px);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121a1f; --surface:#1b262d; --fg:#e4ecef; --muted:#93a6b0; --line:#2d3c45;
+  --accent:#f0953f; --accent-fg:#1a1208;
+  --board:#33515f; --board-hi:#3f6070; --board-edge:#1d3039; --hole:#1c2e36; --board-fg:#e6eff3;
+  --ok:#53b882; --bad:#e2665d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121a1f; --surface:#1b262d; --fg:#e4ecef; --muted:#93a6b0; --line:#2d3c45;
+  --accent:#f0953f; --accent-fg:#1a1208;
+  --board:#33515f; --board-hi:#3f6070; --board-edge:#1d3039; --hole:#1c2e36; --board-fg:#e6eff3;
+  --ok:#53b882; --bad:#e2665d; color-scheme:dark}
+
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-block:14px 0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:1.7rem;letter-spacing:-.02em;margin:0;line-height:1;flex:1 0 auto;white-space:nowrap}
+.hbtns{display:flex;gap:6px;flex-wrap:wrap}
+h1 span{color:var(--accent)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:500}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.summary{display:flex;flex-wrap:wrap;gap:6px;font-size:.82rem}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted)}
+.chip b{color:var(--fg);font-weight:600}
+
+/* board */
+.board{background:linear-gradient(180deg,var(--board-hi),var(--board));border:3px solid var(--board-edge);border-radius:18px;
+  padding:10px 10px 12px;color:var(--board-fg);box-shadow:0 10px 24px -14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12)}
+.row{display:grid;grid-template-columns:1.6em 1fr var(--kw,64px);align-items:center;gap:8px;padding:5px 6px;border-radius:12px}
+.row + .row{margin-top:2px}
+.row.current{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.28)}
+.row.past{cursor:pointer}
+.row.scratch{opacity:.6}
+.row.scratch.used{opacity:.92}
+.row.scratch:has(.sel){opacity:1;background:rgba(255,255,255,.05)}
+.draft-tag{font-size:.62rem;opacity:.75;text-transform:uppercase;letter-spacing:.05em;text-align:center}
+.row.past:hover{background:rgba(255,255,255,.06)}
+.num{font-variant-numeric:tabular-nums;font-size:.8rem;opacity:.7;text-align:right}
+.slots{display:flex;gap:clamp(4px,1.6vw,8px);justify-content:center;min-width:0}
+.secret{border-bottom:2px dashed rgba(255,255,255,.25);padding-bottom:10px;margin-bottom:6px}
+.secret .num{font-size:.95rem;opacity:.9}
+
+.peg{width:var(--peg);height:var(--peg);border-radius:50%;flex:none;border:0;padding:0;position:relative;
+  display:grid;place-items:center;font-size:calc(var(--peg) * .42);line-height:1;color:rgba(0,0,0,.55);
+  background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.75) 0 9%, transparent 28%), var(--c);
+  box-shadow:inset 0 -3px 5px rgba(0,0,0,.28), 0 2px 3px rgba(0,0,0,.35)}
+.peg.hole{background:var(--hole);box-shadow:inset 0 3px 5px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.12)}
+.peg.vide{background:var(--hole);box-shadow:inset 0 3px 5px rgba(0,0,0,.55), 0 0 0 2px rgba(255,255,255,.45)}
+.peg.vide::after{content:"";width:40%;height:2px;background:rgba(255,255,255,.55);transform:rotate(-45deg);border-radius:2px}
+.peg.cover{background:repeating-linear-gradient(45deg,#2b3f49 0 6px,#33505d 6px 12px);box-shadow:inset 0 0 0 2px rgba(255,255,255,.15);color:#cfe0e8;font-family:var(--display);font-weight:800}
+.peg.sel{outline:3px solid #fff;outline-offset:2px}
+.peg.light{color:rgba(0,0,0,.6)}
+.peg.dark{color:rgba(255,255,255,.8)}
+.nosym .peg .s{display:none}
+button.peg:active{transform:scale(.93)}
+
+.keys{display:grid;grid-auto-flow:column;grid-template-rows:repeat(2, 12px);gap:4px;padding:3px;border-radius:8px;background:rgba(0,0,0,.12)}
+.keys.pos{grid-template-rows:12px}
+.k{width:12px;height:12px;border-radius:50%;background:var(--hole);box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.k.b{background:radial-gradient(circle at 35% 30%, #6b6b6b, #0d0d0d 70%);box-shadow:0 0 0 1px rgba(255,255,255,.4)}
+.k.w{background:radial-gradient(circle at 35% 30%, #fff, #d9d9d9 70%);box-shadow:0 1px 1px rgba(0,0,0,.4)}
+.validate-cell{display:flex;justify-content:center}
+.keys{justify-self:center}
+.secret > span:last-child{justify-self:center;text-align:center}
+.go{border:0;border-radius:8px;background:var(--accent);color:var(--accent-fg);font-weight:600;padding:6px 10px;font-size:.85rem}
+.go:disabled{background:rgba(255,255,255,.15);color:rgba(255,255,255,.5);cursor:not-allowed}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);align-items:center}
+.legend i{display:inline-block;vertical-align:-2px;margin-right:5px}
+.remaining{margin-left:auto;font-variant-numeric:tabular-nums}
+
+.result{border-radius:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.result h2{font-family:var(--display);margin:0;font-size:1.3rem}
+.result.win h2{color:var(--ok)} .result.lose h2{color:var(--bad)}
+.result p{margin:0;color:var(--muted)}
+.stats{display:flex;gap:16px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.stats b{display:block;font-size:1.15rem;color:var(--fg)}
+
+/* tray */
+.tray{position:sticky;bottom:0;margin-inline:calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding:10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background:var(--bg);border-top:1px solid var(--line);z-index:5}
+.tray-in{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.palette{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.palette .peg{--peg:clamp(36px, 11vw, 44px)}
+.palette .peg.vide{background:#2a414c}
+.actions{display:flex;gap:8px;justify-content:center}
+
+/* settings dialog */
+.overlay{position:fixed;inset:0;background:rgba(10,18,22,.55);display:grid;place-items:end center;z-index:20;
+  padding:env(safe-area-inset-top,0px) max(0px, env(safe-area-inset-right,0px)) 0 max(0px, env(safe-area-inset-left,0px))}
+@media (min-width:600px){.overlay{place-items:center}}
+.sheet{background:var(--surface);color:var(--fg);width:min(520px,100%);max-height:92%;overflow:auto;border-radius:18px 18px 0 0;
+  padding:18px max(16px, env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px, env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:14px}
+@media (min-width:600px){.sheet{border-radius:18px}}
+.sheet h2{font-family:var(--display);margin:0;font-size:1.35rem}
+.field{display:flex;flex-direction:column;gap:6px}
+.field > span{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+.field small{color:var(--muted)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:transparent;border-radius:10px;padding:7px 12px;min-width:42px;font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:600}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.presets button{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:9px 10px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.presets button b{font-weight:600}
+.presets button small{color:var(--muted);font-size:.75rem}
+.presets button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.space{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:.9rem;font-variant-numeric:tabular-nums}
+.space.err{color:var(--bad)}
+.sheet-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.help p{margin:0 0 6px;color:var(--muted);font-size:.9rem}
+
+@media (prefers-reduced-motion: no-preference){
+  .row.just .peg{animation:pop .25s ease-out both}
+  @keyframes pop{from{transform:scale(.6)}to{transform:scale(1)}}
+}
+</style>
+</head>
+<body>
+
+
+<div class="wrap" id="app">
+  <header>
+    <h1>Code <span>Secret</span></h1>
+    <div class="hbtns">
+    <button class="btn" id="btnHelp" aria-label="Règles du jeu">Règles</button>
+    <button class="btn" id="btnSettings">Niveau</button>
+    <button class="btn primary" id="btnNew">Nouvelle partie</button>
+    </div>
+  </header>
+  <div class="summary" id="summary"></div>
+  <div class="board" id="board" aria-live="polite"></div>
+  <div class="legend">
+    <span><i class="k b"></i>bien placé</span>
+    <span><i class="k w"></i>bonne couleur, mal placé</span>
+    <span class="remaining" id="remaining"></span>
+  </div>
+  <div id="result"></div>
+  <div class="tray">
+    <div class="tray-in">
+      <div class="palette" id="palette"></div>
+      <div class="actions">
+        <button class="btn" id="btnBack">Effacer</button>
+        <button class="btn" id="btnClear">Vider la ligne</button>
+        <button class="btn primary" id="btnGo">Valider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settings" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <h2 id="setTitle">Niveau de difficulté</h2>
+    <div class="field"><span>Préréglages</span><div class="presets" id="presets"></div></div>
+    <div class="field"><span>Nombre de pions</span><div class="seg" id="segLen"></div></div>
+    <div class="field"><span>Nombre de couleurs</span><div class="seg" id="segCol"></div></div>
+    <div class="field"><span>Trou vide comme couleur (« sans pion »)</span><div class="seg" id="segEmpty"></div>
+      <small>Le code peut contenir des trous vides, qui comptent comme une couleur en plus.</small></div>
+    <div class="field"><span>Répétitions dans le code</span><div class="seg" id="segDup"></div>
+      <small id="dupHint"></small></div>
+    <div class="field"><span>Indices noirs et blancs</span><div class="seg" id="segHint"></div>
+      <small id="hintHint"></small></div>
+    <div class="field"><span>Nombre d'essais</span><div class="seg" id="segTries"></div></div>
+    <div class="field"><span>Aides</span><div class="seg" id="segSym"></div><div class="seg" id="segCount"></div></div>
+    <div class="space" id="space"></div>
+    <div class="sheet-actions">
+      <button class="btn" id="setCancel">Annuler</button>
+      <button class="btn primary" id="setApply">Jouer avec ce niveau</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="help" hidden>
+  <div class="sheet help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle">Règles</h2>
+    <p>L'ordinateur cache un code de pions colorés. Trouve-le en un minimum d'essais.</p>
+    <p>Touche une couleur pour la poser dans la case sélectionnée. Touche une case pour la sélectionner, touche-la encore pour la vider. Touche une ligne déjà jouée pour la recopier dans la ligne sélectionnée.</p>
+    <p>Seule la ligne encadrée, juste après le dernier essai, est validée et comptée. Les lignes suivantes sont un <b>brouillon</b> : pose-y ce que tu veux pour réfléchir. Quand tu valides, la ligne suivante devient la ligne à jouer avec ce que tu y avais mis.</p>
+    <p>Après chaque essai : un pion <b>noir</b> par pion de bonne couleur à la bonne place, un pion <b>blanc</b> par pion de bonne couleur mal placé. En mode <b>groupé</b>, l'ordre des indices ne dit pas quels pions sont concernés. En mode <b>placé</b>, chaque indice est en face de son pion (le 1er indice correspond au 1er pion).</p>
+    <p><b>Unique</b> : chaque couleur au plus une fois dans le code. <b>Double</b> : au plus deux fois. <b>Libre</b> : sans limite. Tes propositions, elles, peuvent répéter librement.</p>
+    <p>Clavier : chiffres 1 à 9 et 0 pour les couleurs, Retour arrière pour effacer, flèches pour changer de case ou de ligne, Entrée pour valider.</p>
+    <div class="sheet-actions"><button class="btn primary" id="helpClose">Compris</button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+const COLORS = [
+  {name:"Rouge",  c:"#e2412f", s:"●"},
+  {name:"Jaune",  c:"#f5cc29", s:"▲"},
+  {name:"Vert",   c:"#3aa655", s:"■"},
+  {name:"Bleu",   c:"#2f6fdc", s:"◆"},
+  {name:"Blanc",  c:"#f3f1ea", s:"★"},
+  {name:"Noir",   c:"#25272b", s:"✚"},
+  {name:"Orange", c:"#f2862a", s:"♥"},
+  {name:"Violet", c:"#8a4fc9", s:"✦"},
+  {name:"Rose",   c:"#f17cb0", s:"♣"},
+  {name:"Cyan",   c:"#3cc9d6", s:"⬢"},
+];
+const DARK_PEGS = new Set([3,5,7]);
+const EMPTY_NAME = "Vide";
+const LENGTHS = [3,4,5,6];
+const COLOR_COUNTS = [4,5,6,7,8,9,10];
+const TRIES = [6,8,10,12,0]; // 0 = illimité
+const DUPS = [["single","Unique"],["double","Double"],["free","Libre (+)"]];
+const PRESETS = [
+  {id:"decouverte", name:"Découverte", desc:"4 pions · 6 couleurs · unique · indices placés", s:{len:4,colors:6,empty:false,dup:"single",tries:12,hint:"positional"}},
+  {id:"classique",  name:"Classique",  desc:"4 pions · 6 couleurs · libre",  s:{len:4,colors:6,empty:false,dup:"free",tries:10,hint:"grouped"}},
+  {id:"avance",     name:"Avancé",     desc:"5 pions · 8 couleurs · libre",  s:{len:5,colors:8,empty:false,dup:"free",tries:12,hint:"grouped"}},
+  {id:"expert",     name:"Expert",     desc:"6 pions · 8 couleurs + vide",   s:{len:6,colors:8,empty:true,dup:"free",tries:12,hint:"grouped"}},
+];
+const DEFAULT = {len:4,colors:6,empty:false,dup:"free",tries:10,hint:"grouped",sym:true,count:false};
+const STORE = "code-secret-v1";
+
+const $ = id => document.getElementById(id);
+const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify({settings, game, stats})); } catch {} };
+
+let saved = load();
+let settings = {...DEFAULT, ...(saved.settings||{})};
+let stats = saved.stats || {};
+let game = saved.game || null;
+let draft = null;
+
+/* ---------- engine ---------- */
+const alphabet = s => s.colors + (s.empty ? 1 : 0);
+const maxRep = s => s.dup === "single" ? 1 : s.dup === "double" ? 2 : Infinity;
+function fact(n){ let r=1; for(let i=2;i<=n;i++) r*=i; return r; }
+function comb(n,k){ if(k<0||k>n) return 0; let r=1; for(let i=1;i<=k;i++) r=r*(n-k+i)/i; return Math.round(r); }
+function codeSpace(s){
+  const m = alphabet(s), k = s.len;
+  if (s.dup === "free") return Math.pow(m,k);
+  if (s.dup === "single") return m < k ? 0 : fact(m)/fact(m-k);
+  let t = 0;
+  for (let j=0; 2*j<=k; j++) t += comb(m,j) * comb(m-j, k-2*j) * fact(k) / Math.pow(2,j);
+  return t;
+}
+function makeSecret(s){
+  const m = alphabet(s), cap = maxRep(s), used = new Array(m).fill(0), code = [];
+  const rnd = n => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+  while (code.length < s.len){
+    const c = rnd(m);
+    if (used[c] < cap){ used[c]++; code.push(c); }
+  }
+  return code;
+}
+function score(secret, guess, m){
+  let b = 0; const cs = new Array(m).fill(0), cg = new Array(m).fill(0);
+  for (let i=0;i<secret.length;i++){ if (secret[i]===guess[i]) b++; cs[secret[i]]++; cg[guess[i]]++; }
+  let common = 0; for (let c=0;c<m;c++) common += Math.min(cs[c], cg[c]);
+  return {b, w: common - b};
+}
+function positional(secret, guess, m){
+  const left = new Array(m).fill(0), marks = guess.map((g,i) => g === secret[i] ? "b" : null);
+  secret.forEach((c,i) => { if (marks[i] === null) left[c]++; });
+  guess.forEach((g,i) => { if (marks[i] === null && left[g] > 0){ left[g]--; marks[i] = "w"; } });
+  return marks;
+}
+
+/* ---------- game ---------- */
+function newGame(){
+  game = {s:{len:settings.len,colors:settings.colors,empty:settings.empty,dup:settings.dup,tries:settings.tries,hint:settings.hint},
+          secret:makeSecret(settings), guesses:[], rows:{}, sel:{row:0,col:0}, over:false, won:false, counted:false};
+  save(); render();
+}
+const curIdx = () => game.guesses.length;
+function getRow(i){ return game.rows[i] || (game.rows[i] = new Array(game.s.len).fill(null)); }
+function lastRow(){
+  if (game.s.tries) return game.s.tries - 1;
+  const used = Object.keys(game.rows).map(Number).filter(i => game.rows[i].some(v => v!==null));
+  return Math.max(curIdx() + 2, game.sel.row + 1, ...used.map(i => i + 1));
+}
+function place(c){
+  if (!game || game.over) return;
+  const r = getRow(game.sel.row);
+  r[game.sel.col] = c;
+  const next = nextEmpty(r, game.sel.col);
+  game.sel.col = next === -1 ? Math.min(game.sel.col+1, game.s.len-1) : next;
+  save(); render();
+}
+function nextEmpty(r, from){
+  const n = r.length;
+  for (let i=1;i<=n;i++){ const j=(from+i)%n; if (r[j]===null) return j; }
+  return -1;
+}
+function backspace(){
+  if (!game || game.over) return;
+  const r = getRow(game.sel.row);
+  if (r[game.sel.col] !== null) r[game.sel.col] = null;
+  else if (game.sel.col > 0){ game.sel.col--; r[game.sel.col] = null; }
+  save(); render();
+}
+function clearRow(){ if (!game || game.over) return; getRow(game.sel.row).fill(null); game.sel.col = 0; save(); render(); }
+function submit(){
+  if (!game || game.over) return;
+  const cur = curIdx(), code = getRow(cur);
+  if (code.some(v => v===null)) return;
+  const m = alphabet(game.s), r = score(game.secret, code, m);
+  game.guesses.push({code:code.slice(), ...r, pos:positional(game.secret, code, m)});
+  delete game.rows[cur];
+  if (game.sel.row <= cur){ const nr = getRow(cur+1), e = nr.indexOf(null); game.sel = {row:cur+1, col: e === -1 ? 0 : e}; }
+  if (r.b === game.s.len){ game.over = true; game.won = true; }
+  else if (game.s.tries && game.guesses.length >= game.s.tries){ game.over = true; }
+  if (game.over && !game.counted){
+    game.counted = true;
+    const key = statKey(game.s), st = stats[key] || {played:0,won:0,tries:0,best:0};
+    st.played++; if (game.won){ st.won++; st.tries += game.guesses.length; st.best = st.best ? Math.min(st.best, game.guesses.length) : game.guesses.length; }
+    stats[key] = st;
+  }
+  save(); render(true);
+}
+const statKey = s => [s.len,s.colors,s.empty?1:0,s.dup,s.tries,s.hint||"grouped"].join("-");
+
+/* ---------- remaining-code counter ---------- */
+let countJob = 0;
+function countRemaining(){
+  const el = $("remaining");
+  if (!settings.count || !game){ el.textContent = ""; return; }
+  const job = ++countJob, s = game.s, m = alphabet(s), k = s.len, cap = maxRep(s), gs = game.guesses;
+  if (game.over){ el.textContent = ""; return; }
+  if (!gs.length){ el.textContent = fmt(codeSpace(s)) + " codes possibles"; return; }
+  el.textContent = "Calcul…";
+  const digits = new Array(k).fill(0), cnt = new Array(m).fill(0);
+  let total = Math.pow(m,k), idx = 0, found = 0;
+  const step = () => {
+    if (job !== countJob) return;
+    const stop = Math.min(total, idx + 150000);
+    for (; idx < stop; idx++){
+      let x = idx; cnt.fill(0); let ok = true;
+      for (let i=k-1;i>=0;i--){ const d = x % m; x = (x - d)/m; digits[i]=d; if (++cnt[d] > cap){ ok=false; } }
+      if (!ok) continue;
+      for (const g of gs){ const r = score(digits, g.code, m); if (r.b!==g.b || r.w!==g.w){ ok=false; break; } }
+      if (ok) found++;
+    }
+    if (idx < total){ el.textContent = "Calcul… " + Math.round(100*idx/total) + " %"; setTimeout(step, 0); }
+    else el.textContent = found === 1 ? "1 seul code encore possible" : fmt(found) + " codes encore possibles";
+  };
+  setTimeout(step, 0);
+}
+const fmt = n => n.toLocaleString("fr-FR");
+
+/* ---------- rendering ---------- */
+function pegEl(c, s, opts={}){
+  const tag = opts.button ? "button" : "span";
+  const el = document.createElement(tag);
+  el.className = "peg";
+  if (c === null || c === undefined){ el.classList.add("hole"); el.setAttribute("aria-label","case vide"); }
+  else if (c === "?"){ el.classList.add("cover"); el.textContent = "?"; el.setAttribute("aria-label","pion caché"); }
+  else if (s.empty && c === s.colors){ el.classList.add("vide"); el.setAttribute("aria-label", EMPTY_NAME); el.title = EMPTY_NAME; }
+  else {
+    const col = COLORS[c];
+    el.style.setProperty("--c", col.c);
+    el.classList.add(DARK_PEGS.has(c) ? "dark" : "light");
+    const sp = document.createElement("span"); sp.className = "s"; sp.textContent = col.s; sp.setAttribute("aria-hidden","true");
+    el.appendChild(sp);
+    el.setAttribute("aria-label", col.name); el.title = col.name;
+  }
+  return el;
+}
+function keysEl(r, k, posMode){
+  const el = document.createElement("div"); el.className = "keys" + (posMode ? " pos" : "");
+  el.setAttribute("aria-label", r ? `${r.b} bien placé${r.b>1?"s":""}, ${r.w} mal placé${r.w>1?"s":""}` : "pas encore d'indice");
+  for (let i=0;i<k;i++){
+    const d = document.createElement("i"); d.className = "k";
+    if (r && posMode && r.pos){ if (r.pos[i]) d.classList.add(r.pos[i]); }
+    else if (r){ if (i < r.b) d.classList.add("b"); else if (i < r.b + r.w) d.classList.add("w"); }
+    el.appendChild(d);
+  }
+  return el;
+}
+function row(num, cls){
+  const r = document.createElement("div"); r.className = "row " + (cls||"");
+  const n = document.createElement("span"); n.className = "num"; n.textContent = num; r.appendChild(n);
+  return r;
+}
+function render(justPlayed){
+  const s = game.s, board = $("board");
+  document.body.classList.toggle("nosym", !settings.sym);
+  board.innerHTML = "";
+  const kc = s.hint === "positional" ? s.len : Math.ceil(s.len/2);
+  board.style.setProperty("--kw", Math.max(64, kc*16 + 8) + "px");
+  // secret
+  const sec = row("", "secret");
+  sec.querySelector(".num").textContent = game.over ? (game.won ? "✓" : "✗") : "";
+  const ss = document.createElement("div"); ss.className = "slots";
+  game.secret.forEach(c => ss.appendChild(pegEl(game.over ? c : "?", s)));
+  sec.appendChild(ss);
+  const lab = document.createElement("span"); lab.style.cssText = "font-size:.72rem;opacity:.75"; lab.textContent = game.over ? "le code" : "code caché";
+  sec.appendChild(lab);
+  board.appendChild(sec);
+
+  game.guesses.forEach((g, i) => {
+    const r = row(i+1, "past" + (justPlayed && i === game.guesses.length-1 ? " just" : ""));
+    const sl = document.createElement("div"); sl.className = "slots";
+    g.code.forEach(c => sl.appendChild(pegEl(c, s)));
+    r.appendChild(sl); r.appendChild(keysEl(g, s.len, s.hint === "positional"));
+    r.title = "Recopier cette ligne";
+    r.addEventListener("click", () => { if (game.over) return; game.rows[game.sel.row] = g.code.slice(); game.sel.col = s.len-1; save(); render(); });
+    board.appendChild(r);
+  });
+
+  if (!game.over){
+    const cur = curIdx(), last = lastRow();
+    for (let ri = cur; ri <= last; ri++){
+      const isCur = ri === cur, data = getRow(ri);
+      const r = row(ri+1, isCur ? "current" : "scratch" + (data.some(v => v!==null) ? " used" : ""));
+      const sl = document.createElement("div"); sl.className = "slots";
+      data.forEach((c, i) => {
+        const p = pegEl(c, s, {button:true});
+        if (ri === game.sel.row && i === game.sel.col) p.classList.add("sel");
+        p.addEventListener("click", () => {
+          if (game.sel.row === ri && game.sel.col === i && data[i] !== null) data[i] = null;
+          game.sel = {row:ri, col:i}; save(); render();
+        });
+        sl.appendChild(p);
+      });
+      r.appendChild(sl);
+      if (isCur){
+        const cell = document.createElement("div"); cell.className = "validate-cell";
+        const go = document.createElement("button"); go.className = "go"; go.textContent = "OK";
+        go.disabled = data.some(v => v===null); go.addEventListener("click", submit);
+        cell.appendChild(go); r.appendChild(cell);
+      } else {
+        const tag = document.createElement("span"); tag.className = "draft-tag"; tag.textContent = "brouillon"; r.appendChild(tag);
+      }
+      board.appendChild(r);
+    }
+  }
+
+  // palette
+  const pal = $("palette"); pal.innerHTML = "";
+  for (let c=0;c<alphabet(s);c++){
+    const p = pegEl(c, s, {button:true});
+    const key = c < 9 ? String(c+1) : c === 9 ? "0" : "";
+    if (key) p.setAttribute("aria-keyshortcuts", key);
+    p.disabled = game.over;
+    p.addEventListener("click", () => place(c));
+    pal.appendChild(p);
+  }
+  $("btnGo").disabled = game.over || getRow(curIdx()).some(v => v===null);
+  $("btnBack").disabled = $("btnClear").disabled = game.over;
+
+  // summary
+  const dupName = DUPS.find(d => d[0]===s.dup)[1];
+  $("summary").innerHTML = "";
+  [["Pions", s.len], ["Couleurs", s.colors + (s.empty ? " + vide" : "")], ["Répétitions", dupName], ["Indices", s.hint === "positional" ? "placés" : "groupés"],
+   ["Essai", game.over ? game.guesses.length : (game.guesses.length+1) + (s.tries ? " / " + s.tries : "")]]
+   .forEach(([k,v]) => { const c = document.createElement("span"); c.className="chip"; c.innerHTML = `${k} <b></b>`; c.querySelector("b").textContent = v; $("summary").appendChild(c); });
+
+  // result
+  const res = $("result"); res.innerHTML = "";
+  if (game.over){
+    const st = stats[statKey(s)] || {played:0,won:0,tries:0,best:0};
+    const box = document.createElement("div"); box.className = "result " + (game.won ? "win" : "lose");
+    const n = game.guesses.length;
+    box.innerHTML = `<h2>${game.won ? "Code cassé !" : "Perdu…"}</h2>
+      <p>${game.won ? `Trouvé en ${n} essai${n>1?"s":""}.` : "Le code est révélé en haut du plateau."}</p>
+      <div class="stats">
+        <span>Parties<b>${st.played}</b></span>
+        <span>Réussite<b>${st.played ? Math.round(100*st.won/st.played) : 0} %</b></span>
+        <span>Moyenne<b>${st.won ? (st.tries/st.won).toFixed(1).replace(".",",") : "–"}</b></span>
+        <span>Record<b>${st.best || "–"}</b></span>
+      </div>
+      <div><button class="btn primary" id="again">Rejouer à ce niveau</button></div>`;
+    res.appendChild(box);
+    box.querySelector("#again").addEventListener("click", newGame);
+    if (justPlayed) box.scrollIntoView({behavior:"smooth", block:"nearest"});
+  } else if (justPlayed){
+    board.querySelector(".row.current")?.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+  countRemaining();
+}
+
+/* ---------- settings sheet ---------- */
+function seg(el, items, get, set){
+  el.innerHTML = "";
+  items.forEach(([val, label]) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(get() === val));
+    b.addEventListener("click", () => { set(val); drawSettings(); });
+    el.appendChild(b);
+  });
+}
+function drawSettings(){
+  const d = draft;
+  const pr = $("presets"); pr.innerHTML = "";
+  PRESETS.forEach(p => {
+    const b = document.createElement("button"); b.type = "button";
+    const on = Object.keys(p.s).every(k => d[k] === p.s[k]);
+    b.setAttribute("aria-pressed", String(on));
+    b.innerHTML = `<b>${p.name}</b><small>${p.desc}</small>`;
+    b.addEventListener("click", () => { Object.assign(d, p.s); drawSettings(); });
+    pr.appendChild(b);
+  });
+  seg($("segLen"), LENGTHS.map(n => [n, String(n)]), () => d.len, v => d.len = v);
+  seg($("segCol"), COLOR_COUNTS.map(n => [n, String(n)]), () => d.colors, v => d.colors = v);
+  seg($("segEmpty"), [[false,"Non"],[true,"Oui, avec trou vide"]], () => d.empty, v => d.empty = v);
+  seg($("segDup"), DUPS, () => d.dup, v => d.dup = v);
+  seg($("segHint"), [["grouped","Groupés (classique)"],["positional","À la place du pion (plus facile)"]], () => d.hint, v => d.hint = v);
+  $("hintHint").textContent = d.hint === "positional" ? "Chaque indice est posé en face du pion qu'il concerne : tu sais quel pion est bien placé." : "Les indices sont regroupés, noirs d'abord : tu ne sais pas quel pion est concerné.";
+  seg($("segTries"), TRIES.map(n => [n, n ? String(n) : "∞"]), () => d.tries, v => d.tries = v);
+  seg($("segSym"), [[true,"Symboles sur les pions"],[false,"Sans symboles"]], () => d.sym, v => d.sym = v);
+  seg($("segCount"), [[false,"Sans compteur"],[true,"Compter les codes encore possibles"]], () => d.count, v => d.count = v);
+  $("dupHint").textContent = {single:"Chaque couleur apparaît au plus une fois.", double:"Une couleur peut apparaître jusqu'à deux fois.", free:"Une couleur peut apparaître autant de fois que voulu."}[d.dup];
+  const n = codeSpace(d), sp = $("space");
+  if (!n){ sp.className = "space err"; sp.textContent = `Impossible : ${alphabet(d)} couleur${alphabet(d)>1?"s":""} ne suffisent pas pour ${d.len} pions tous différents. Ajoute des couleurs ou autorise les répétitions.`; }
+  else { sp.className = "space"; sp.textContent = `${fmt(n)} combinaisons possibles pour le code secret.`; }
+  $("setApply").disabled = !n;
+  const sameGame = ["len","colors","empty","dup","tries","hint"].every(k => d[k] === game.s[k]);
+  $("setApply").textContent = sameGame && !game.over && game.guesses.length ? "Enregistrer" : sameGame ? "Enregistrer" : "Nouvelle partie à ce niveau";
+}
+function openSettings(){ draft = {...settings}; drawSettings(); $("settings").hidden = false; $("setApply").focus(); }
+function closeSettings(){ $("settings").hidden = true; }
+$("btnSettings").addEventListener("click", openSettings);
+$("setCancel").addEventListener("click", closeSettings);
+$("settings").addEventListener("click", e => { if (e.target.id === "settings") closeSettings(); });
+$("setApply").addEventListener("click", () => {
+  const sameGame = ["len","colors","empty","dup","tries","hint"].every(k => draft[k] === game.s[k]);
+  settings = {...draft}; closeSettings();
+  if (sameGame){ save(); render(); } else newGame();
+});
+$("btnHelp").addEventListener("click", () => { $("help").hidden = false; $("helpClose").focus(); });
+$("helpClose").addEventListener("click", () => $("help").hidden = true);
+$("help").addEventListener("click", e => { if (e.target.id === "help") $("help").hidden = true; });
+
+$("btnNew").addEventListener("click", newGame);
+$("btnBack").addEventListener("click", backspace);
+$("btnClear").addEventListener("click", clearRow);
+$("btnGo").addEventListener("click", submit);
+
+document.addEventListener("keydown", e => {
+  if (!$("settings").hidden || !$("help").hidden){ if (e.key === "Escape"){ closeSettings(); $("help").hidden = true; } return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^[0-9]$/.test(e.key)){ const c = e.key === "0" ? 9 : +e.key - 1; if (c < alphabet(game.s)) { place(c); e.preventDefault(); } }
+  else if (e.key === "Backspace"){ backspace(); e.preventDefault(); }
+  else if (e.key === "Enter"){ if (game.over) newGame(); else submit(); e.preventDefault(); }
+  else if (e.key === "ArrowLeft" && !game.over){ game.sel.col = Math.max(0, game.sel.col-1); render(); e.preventDefault(); }
+  else if (e.key === "ArrowRight" && !game.over){ game.sel.col = Math.min(game.s.len-1, game.sel.col+1); render(); e.preventDefault(); }
+  else if (e.key === "ArrowUp" && !game.over){ game.sel.row = Math.max(curIdx(), game.sel.row-1); render(); e.preventDefault(); }
+  else if (e.key === "ArrowDown" && !game.over){ game.sel.row = Math.min(lastRow(), game.sel.row+1); render(); e.preventDefault(); }
+});
+
+// expose engine for tests
+window.__codeSecret = {score, codeSpace, makeSecret};
+
+if (game && game.s && !game.s.hint) game.s.hint = "grouped";
+if (!game || !game.secret || !game.rows || game.secret.length !== game.s.len) newGame(); else render();
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+</script>
+</body>
+</html>
